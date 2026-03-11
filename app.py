@@ -35,11 +35,21 @@ if uploaded_file is not None:
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel('gemini-2.5-flash')
             
-            # Construct the prompt with data context
-            # We send a summary and the first few rows so the LLM understands the schema
-            context = f"Data Summary:\n{df.describe(include='all').to_string()}\n\nSample Rows:\n{df.head(10).to_string()}\n\n"
-            prompt = context + f"User Question: {query}\n\nAct as a senior data analyst. Provide a clear, accurate, and concise text answer based ONLY on the provided data context."
+            # Define Strict Guardrails (The "RAG" constraint)
+            system_prompt = """
+            You are 'Talking Rabbitt', an AI data analyst for enterprise executives. 
+            You have been provided with a statistical summary and sample rows of a dataset.
             
+            CRITICAL INSTRUCTIONS:
+            1. You must ONLY answer questions that can be derived from the provided data context.
+            2. If the user asks a question that is NOT related to the data (e.g., general knowledge, coding help, casual chat, or questions about data not in the schema), you MUST refuse to answer.
+            3. If you refuse, reply EXACTLY with: "I can only answer questions related to the uploaded dataset. Please ask a question about the metrics provided."
+            4. Keep your analytical answers clear, accurate, and concise.
+            """
+            
+            context = f"Data Schema & Summary:\n{df.describe(include='all').to_string()}\n\nSample Data:\n{df.head(10).to_string()}\n\n"
+            prompt = f"{system_prompt}\n{context}\nUser Question: {query}"
+                        
             with st.spinner("Talking to your data..."):
                 try:
                     # 1. Get the Text Answer
